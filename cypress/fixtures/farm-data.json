@@ -1,0 +1,75 @@
+{
+    "users": {
+        "admin": {
+            "username": "admin",
+            "password": "admin123",
+            "role": "administrator",
+            "farmSections": [
+                "Main Coop",
+                "Secondary Coop",
+                "Brooder",
+                "Free Range Area"
+            ]
+        },
+        "supervisor": {
+            "username": "supervisor",
+            "password": "super123",
+            "role": "supervisor",
+            "farmSections": ["Main Coop", "Secondary Coop"]
+        },
+        "worker": {
+            "username": "worker",
+            "password": "work123",
+            "role": "worker",
+            "farmSections": ["Main Coop"]
+        }
+    },
+    "activities": {
+        "eggCollection": {
+            "quantity": 245,
+            "qualityGrade": "A",
+            "coopLocation": "Main Coop",
+            "collectorCount": 2,
+            "qualityMetrics": {
+                "crackedEggs": 3,
+                "doubleYolk": 8,
+                "averageWeight": 58.5
+            }
+        },
+        "mortality": {
+            "count": 3,
+            "suspectedCause": "disease",
+            "affectedCoop": "Secondary Coop",
+            "symptoms": [
+                "Lethargy",
+                "Loss of appetite",
+                "Difficulty breathing"
+            ],
+            "disposalMethod": "Incineration",
+            "vetNotified": true,
+            "ageGroup": "layers"
+        },
+        "feedDistribution": {
+            "amount": 150,
+            "feedType": "Layer Feed",
+            "location": "Main Coop",
+            "notes": "Regular morning feeding"
+        }
+    },
+    "farmData": {
+        "totalFlockSize": 1000,
+        "farmSections": [
+            "Main Coop",
+            "Secondary Coop",
+            "Brooder",
+            "Free Range Area",
+            "Quarantine"
+        ],
+        "alertThresholds": {
+            "mortalityDaily": 5,
+            "mortalityRate": 2.0,
+            "eggProductionMinimum": 800,
+            "feedConsumptionMaximum": 200
+        }
+    }
+}
