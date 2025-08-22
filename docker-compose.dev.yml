@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: farmpilot_dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  # placeholder for app service during development
+  app:
+    image: node:20-alpine
+    working_dir: /usr/src/app
+    volumes:
+      - ./:/usr/src/app
+    command: sh -c "yarn install --frozen-lockfile || npm install; sleep 1"
+    depends_on:
+      - db
+
+volumes:
+  db-data:
