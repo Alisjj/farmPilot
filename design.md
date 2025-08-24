@@ -3,7 +3,7 @@
 ## Technical Design Document
 
 **Version:** 1.0  
-**Date:** August 22, 2025  
+**Date:** August 24, 2025  
 **Project:** Small-Scale Egg Production Management System
 
 ---
@@ -12,20 +12,21 @@
 
 ### 1.1 Purpose
 
-Design and develop a management system for small-scale egg production operations focusing on cost tracking, sales management, and production monitoring.
+Design and develop a management system for small-scale egg production operations focusing on cost tracking, sales management, production monitoring, and labor management.
 
 ### 1.2 Scope
 
 - Daily production logging by supervisor
 - Sales and customer management
 - Local feed production cost calculation
+- Labor management and payroll system
 - Owner dashboard and reporting
 - Real-time egg cost calculation and pricing recommendations
 
 ### 1.3 Key Stakeholders
 
 - **Primary Users:** Farm Owner, Farm Supervisor
-- **Secondary Users:** Future staff members
+- **Secondary Users:** Farm laborers and future staff members
 
 ---
 
@@ -62,21 +63,34 @@ Design and develop a management system for small-scale egg production operations
 - **FR-016:** System shall calculate feed batch costs automatically
 - **FR-017:** Cost per kg of produced feed shall be tracked
 
-#### 2.1.5 Cost Calculation Engine
+#### 2.1.5 Labor Management
 
-- **FR-018:** System shall calculate real-time cost per egg
-- **FR-019:** Feed costs shall be factored into egg cost calculations
-- **FR-020:** Fixed operating costs shall be distributed per egg
-- **FR-021:** System shall suggest selling prices based on cost + margin
-- **FR-022:** Profit/loss analysis shall be available in real-time
+- **FR-018:** System shall maintain laborer database with personal and employment information
+- **FR-019:** Supervisor shall record daily work assignments and attendance
+- **FR-020:** System shall track laborer performance and task completion
+- **FR-021:** Monthly payroll shall be calculated automatically based on attendance
+- **FR-022:** Salary deductions for absences shall be calculated proportionally
+- **FR-023:** Bonus payments and adjustments shall be supported
+- **FR-024:** Payroll status tracking (pending/paid) shall be maintained
+- **FR-025:** Labor cost shall be integrated into egg cost calculations
 
-#### 2.1.6 Reporting and Analytics
+#### 2.1.6 Cost Calculation Engine
 
-- **FR-023:** Owner shall access comprehensive dashboard
-- **FR-024:** Daily, weekly, and monthly reports shall be generated
-- **FR-025:** Production trends and analytics shall be visualized
-- **FR-026:** Financial reports showing profitability shall be available
-- **FR-027:** Data export functionality (Excel/PDF) shall be provided
+- **FR-026:** System shall calculate real-time cost per egg
+- **FR-027:** Feed costs shall be factored into egg cost calculations
+- **FR-028:** Labor costs shall be distributed per egg produced
+- **FR-029:** Fixed operating costs shall be distributed per egg
+- **FR-030:** System shall suggest selling prices based on cost + margin
+- **FR-031:** Profit/loss analysis shall be available in real-time
+
+#### 2.1.7 Reporting and Analytics
+
+- **FR-032:** Owner shall access comprehensive dashboard
+- **FR-033:** Daily, weekly, and monthly reports shall be generated
+- **FR-034:** Production trends and analytics shall be visualized
+- **FR-035:** Financial reports showing profitability shall be available
+- **FR-036:** Labor reports and payroll summaries shall be available
+- **FR-037:** Data export functionality (Excel/PDF) shall be provided
 
 ### 2.2 Non-Functional Requirements
 
@@ -284,11 +298,58 @@ CREATE TABLE batch_ingredients (
     total_cost DECIMAL(10,2) NOT NULL
 );
 
+-- Laborers management
+CREATE TABLE laborers (
+    id SERIAL PRIMARY KEY,
+    employee_id VARCHAR(20) UNIQUE,
+    full_name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20),
+    address TEXT,
+    position VARCHAR(50) NOT NULL, -- General laborer, Feed specialist, etc.
+    monthly_salary DECIMAL(10,2) NOT NULL,
+    hire_date DATE NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    emergency_contact VARCHAR(100),
+    emergency_phone VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Daily work assignments (for tracking, not payment)
+CREATE TABLE daily_work_assignments (
+    id SERIAL PRIMARY KEY,
+    work_date DATE NOT NULL,
+    laborer_id INTEGER REFERENCES laborers(id),
+    tasks_assigned TEXT[], -- Array of tasks: ['collection', 'feeding', 'cleaning']
+    attendance_status VARCHAR(20) DEFAULT 'present' CHECK (attendance_status IN ('present', 'absent', 'half_day', 'late')),
+    performance_notes TEXT,
+    supervisor_id INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(work_date, laborer_id)
+);
+
+-- Monthly payroll records
+CREATE TABLE monthly_payroll (
+    id SERIAL PRIMARY KEY,
+    month_year DATE NOT NULL, -- First day of month
+    laborer_id INTEGER REFERENCES laborers(id),
+    base_salary DECIMAL(10,2) NOT NULL,
+    days_worked INTEGER NOT NULL DEFAULT 0,
+    days_absent INTEGER NOT NULL DEFAULT 0,
+    salary_deductions DECIMAL(8,2) DEFAULT 0, -- For absences or penalties
+    bonus_amount DECIMAL(8,2) DEFAULT 0,
+    final_salary DECIMAL(10,2) NOT NULL,
+    payment_date DATE,
+    payment_status VARCHAR(20) DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid')),
+    notes TEXT,
+    UNIQUE(month_year, laborer_id)
+);
+
 -- Monthly operating costs
 CREATE TABLE operating_costs (
     id SERIAL PRIMARY KEY,
     month_year DATE NOT NULL, -- First day of month
     supervisor_salary DECIMAL(10,2) DEFAULT 0,
+    total_laborer_salaries DECIMAL(10,2) DEFAULT 0, -- Auto-calculated from payroll
     electricity_cost DECIMAL(10,2) DEFAULT 0,
     water_cost DECIMAL(10,2) DEFAULT 0,
     maintenance_cost DECIMAL(10,2) DEFAULT 0,
@@ -396,7 +457,25 @@ POST   /api/costs/operating
 GET    /api/costs/egg-price/{date}
 ```
 
-### 5.6 Reporting Endpoints
+### 5.6 Labor Management Endpoints
+
+```
+GET    /api/laborers
+POST   /api/laborers
+PUT    /api/laborers/{id}
+DELETE /api/laborers/{id}
+
+GET    /api/work-assignments?date={date}&laborer={id}
+POST   /api/work-assignments
+PUT    /api/work-assignments/{id}
+
+GET    /api/payroll/{month_year}
+POST   /api/payroll/generate/{month_year}
+PUT    /api/payroll/{id}
+GET    /api/payroll/summary?year={year}
+```
+
+### 5.7 Reporting Endpoints
 
 ```
 GET    /api/reports/production?start={date}&end={date}
@@ -463,6 +542,36 @@ GET    /api/reports/export/{type}?format={csv|pdf}
 └─────────────────────────────────┘
 ```
 
+#### 6.1.3 Daily Worker Assignment Screen
+
+```
+┌─────────────────────────────────┐
+│ Daily Worker Check-In           │
+├─────────────────────────────────┤
+│ Date: Aug 24, 2025              │
+│                                 │
+│ WORKER ATTENDANCE:              │
+│ ✓ John Doe (General Laborer)    │
+│   Tasks: [✓] Collection         │
+│           [✓] Cleaning          │
+│   Status: [Present ▼]           │
+│                                 │
+│ ✓ Mary Jane (Feed Specialist)   │
+│   Tasks: [✓] Feed Prep          │
+│           [✓] Feeding           │
+│   Status: [Present ▼]           │
+│                                 │
+│ ✗ Peter Paul (General)          │
+│   Status: [Absent ▼]            │
+│   Reason: [Sick leave]          │
+│                                 │
+│ Notes: Mary did excellent job   │
+│ with feed preparation today     │
+│                                 │
+│ [Submit Daily Assignment]       │
+└─────────────────────────────────┘
+```
+
 ### 6.2 Web Dashboard (Owner)
 
 #### 6.2.1 Main Dashboard
@@ -517,6 +626,38 @@ GET    /api/reports/export/{type}?format={csv|pdf}
 └─────────────────────────────────────────────────────────────┘
 ```
 
+#### 6.2.3 Monthly Payroll Screen (Owner)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Monthly Payroll - August 2025                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ PAYROLL SUMMARY                                             │
+│ Total Laborers: 4                                          │
+│ Total Monthly Salaries: ₦180,000                           │
+│                                                             │
+│ INDIVIDUAL RECORDS:                                         │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ John Doe (General Laborer)                              │ │
+│ │ Base Salary: ₦45,000                                    │ │
+│ │ Days Worked: 26/26    Absent: 0 days                   │ │
+│ │ Deductions: ₦0        Bonus: ₦0                        │ │
+│ │ Final Pay: ₦45,000    Status: [Paid ▼]                 │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ Mary Jane (Feed Specialist)                             │ │
+│ │ Base Salary: ₦50,000                                    │ │
+│ │ Days Worked: 24/26    Absent: 2 days                   │ │
+│ │ Deductions: ₦3,846    Bonus: ₦0                        │ │
+│ │ Final Pay: ₦46,154    Status: [Pending ▼]              │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+│ [Generate Payroll] [Export to PDF] [Mark All Paid]         │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 7. Key Algorithms
@@ -533,20 +674,27 @@ function calculateDailyCost(date) {
   const feedCost = calculateFeedCost(date);
   const feedCostPerEgg = feedCost / totalEggs;
 
-  // Calculate fixed costs (monthly costs distributed daily)
-  const monthlyOperatingCosts = getMonthlyOperatingCosts(date);
+  // Calculate monthly labor cost distributed daily
+  const monthlyLaborCosts = getMonthlyLaborCosts(date);
   const daysInMonth = getDaysInMonth(date);
   const avgDailyProduction = getAverageMonthlyProduction(date) / daysInMonth;
+  const laborCostPerEgg = monthlyLaborCosts / daysInMonth / avgDailyProduction;
+
+  // Calculate other fixed costs (supervisor, utilities, etc.)
+  const monthlyOperatingCosts =
+    getMonthlyOperatingCosts(date) - monthlyLaborCosts;
   const fixedCostPerEgg =
     monthlyOperatingCosts / daysInMonth / avgDailyProduction;
 
   // Calculate health costs (bird costs distributed over laying period)
   const healthCostPerEgg = calculateHealthCostPerEgg(date);
 
-  const totalCostPerEgg = feedCostPerEgg + fixedCostPerEgg + healthCostPerEgg;
+  const totalCostPerEgg =
+    feedCostPerEgg + laborCostPerEgg + fixedCostPerEgg + healthCostPerEgg;
 
   return {
     feedCostPerEgg,
+    laborCostPerEgg,
     fixedCostPerEgg,
     healthCostPerEgg,
     totalCostPerEgg,
@@ -587,6 +735,66 @@ function calculateFeedBatchCost(recipe, batchSizeKg, ingredientPrices) {
     costPerKg: totalCost / batchSizeKg,
     ingredients,
   };
+}
+```
+
+### 7.3 Monthly Payroll Calculation
+
+```javascript
+function calculateMonthlyPayroll(laborerId, monthYear) {
+  // Get laborer details
+  const laborer = getLaborerById(laborerId);
+  const baseSalary = laborer.monthly_salary;
+
+  // Get attendance records for the month
+  const workAssignments = getWorkAssignmentsByMonth(laborerId, monthYear);
+  const daysInMonth = getDaysInMonth(monthYear);
+  const workingDaysInMonth = getWorkingDaysInMonth(monthYear); // Exclude Sundays
+
+  // Calculate attendance
+  const daysWorked = workAssignments.filter(
+    (assignment) => assignment.attendance_status === "present"
+  ).length;
+
+  const halfDays = workAssignments.filter(
+    (assignment) => assignment.attendance_status === "half_day"
+  ).length;
+
+  const daysAbsent = workingDaysInMonth - daysWorked - halfDays * 0.5;
+
+  // Calculate proportional salary
+  const dailySalary = baseSalary / workingDaysInMonth;
+  const salaryDeductions =
+    daysAbsent * dailySalary + halfDays * 0.5 * dailySalary;
+
+  // Calculate final salary
+  const earnedSalary = baseSalary - salaryDeductions;
+  const bonusAmount = calculateBonusAmount(laborer, workAssignments);
+  const finalSalary = earnedSalary + bonusAmount;
+
+  return {
+    laborerId,
+    monthYear,
+    baseSalary,
+    daysWorked: daysWorked + halfDays * 0.5,
+    daysAbsent,
+    salaryDeductions,
+    bonusAmount,
+    finalSalary,
+    paymentStatus: "pending",
+  };
+}
+
+function calculateBonusAmount(laborer, workAssignments) {
+  // Performance-based bonus calculation
+  const excellentPerformanceDays = workAssignments.filter(
+    (assignment) =>
+      assignment.performance_notes &&
+      assignment.performance_notes.toLowerCase().includes("excellent")
+  ).length;
+
+  // ₦500 bonus per excellent performance day
+  return excellentPerformanceDays * 500;
 }
 ```
 
@@ -775,5 +983,71 @@ function calculateFeedBatchCost(recipe, batchSizeKg, ingredientPrices) {
 **Document Status:** Draft  
 **Next Review:** September 1, 2025  
 **Approval Required:** Farm Owner
+
+## 14. Implementation updates
+
+Date: August 22, 2025
+
+This section records concrete repository and implementation changes made while aligning the codebase to this design. It is intended as a living changelog for the rebuild.
+
+### 14.1 Summary
+
+- Archived the existing implementation to `legacy/` (moved original `client/` and `server/` directories). A script `scripts/archive_legacy.sh` was added to perform the archival and commit. A local Git tag `pre-rebuild-2025-08-22` was created.
+- Converted the repository into a pnpm workspace (root `package.json` updated, `pnpm-workspace.yaml` and `WORKSPACES.md` added). Dependencies were bootstrapped with `pnpm install`.
+- Introduced a minimal backend scaffold (`server/src/index.ts`, `server/src/db.ts`) wired to Drizzle ORM and PostgreSQL.
+
+### 14.2 Database & migrations
+
+- Drizzle-based schema source added/updated at `shared/schema.ts` to reflect the design tables. Key schema changes include:
+  - `daily_logs` table (replacing legacy daily activities naming).
+  - Normalized ingredient model: `ingredients` catalog + `recipe_ingredients` join table (percentage composition). Removed hard-coded ingredient percent columns from `feed_recipes`.
+  - `batch_ingredients` normalized to reference `ingredient_id` and store `amount_kg`, `cost_per_kg`, and `total_cost`.
+- Migrations created:
+  - `migrations/0000_init.sql` — auto-generated from the prior DB state (snapshot of original schema).
+  - `migrations/0001_design_schema.sql` — manual SQL migration created from this design to reliably apply the new design schema.
+
+### 14.3 Local dev environment
+
+- Development used the system PostgreSQL instance (port 5432 already in use). A dev database `farmpilot_dev` and user `farmpilot` (password `farmpilot`) were created for local development and granted privileges.
+- `drizzle-kit` was used to generate and push migrations to the local dev DB. One generation run triggered interactive rename prompts; to avoid blocking, the canonical design migration (`0001_design_schema.sql`) was created manually.
+
+### 14.4 Code changes and validation
+
+- Server routes and TypeScript code have been progressively updated to match the new schema names. Example: `server/src/routes/dailyActivities.ts` was updated to use `daily_logs` and to coerce decimal fields (`feed_given_kg`) to strings for Drizzle compatibility; file-level TypeScript checks pass for that file.
+- Shared validation is currently implemented ad-hoc (some Zod schemas inline in routes); plan is to move reusable validators into `shared/` for reuse by client and server.
+
+### 14.5 Git / remote status
+
+- All archival and scaffold commits and a local tag were created. Attempted `git push` for the `rebuild/design-v1` branch and tags failed with HTTP 403 (remote permissions). The pushes remain pending on the user's environment or on corrected remote credentials.
+
+### 14.6 Tests / checks performed
+
+- `pnpm install` completed for the workspace. TypeScript checks have been run iteratively; several issues were fixed (package.json linting, Drizzle typing, JWT typing). Ongoing: full workspace `tsc` should be re-run and remaining route files reconciled.
+- `drizzle-kit push` applied changes to the local dev DB after the DB user was created.
+
+### 14.7 Outstanding items / next steps
+
+1. Finish migrating server code to the new schema names and move shared Zod validators into `shared/` for reuse. Run: `pnpm -w -s exec tsc --noEmit` and fix remaining type errors.
+2. Decide migration workflow (manual SQL migrations vs. non-interactive Drizzle diffs). If continuing with Drizzle diffs, the interactive rename prompts must be resolved manually when generating migrations.
+3. Add seed scripts (owner user, sample houses, sample ingredients/recipes) and wire a `dev:seed` script in `package.json`.
+4. Push the `rebuild/design-v1` branch and tags to remote (requires correct credentials or permission fixes).
+5. Implement API endpoints per the design and add unit/integration tests (Cypress E2E already present in the repo; adapt tests to new API paths if names change).
+
+### 14.8 Coverage mapping (high level)
+
+- Design -> Schema: Done (schema in `shared/schema.ts`, normalized ingredients).
+- Schema -> Migrations: Partially done (manual `0001_design_schema.sql` created; auto-diff generation was interactive and deferred).
+- API -> Server: In progress (some routes updated; full reconciliation pending).
+- Dev infra (pnpm, Docker compose): pnpm workspace setup done; docker-compose dev DB left unused due to local Postgres conflict.
+
+### 14.9 Where to look (useful paths)
+
+- `shared/schema.ts` — canonical Drizzle schema for the design
+- `migrations/0001_design_schema.sql` — manual migration derived from the design
+- `scripts/archive_legacy.sh` — archival script used to move legacy code to `legacy/`
+- `server/src/routes/` — server routes being migrated to the new schema
+- `pnpm-workspace.yaml`, root `package.json` — workspace config and scripts
+
+---
 
 ---

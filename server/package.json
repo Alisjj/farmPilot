@@ -1,0 +1,37 @@
+{
+  "name": "farmpilot-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx ./index.ts",
+    "build": "tsc -p ../tsconfig.json",
+    "start": "node ./dist/index.js",
+    "test": "jest --config ./jest.config.mjs --passWithNoTests"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "dotenv": "^17.2.1",
+    "pg": "^8.16.3",
+    "drizzle-orm": "^0.39.1",
+    "jsonwebtoken": "^9.0.2",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "morgan": "^1.10.0",
+    "helmet": "^7.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1",
+    "typescript": "5.6.3",
+    "@types/express": "4.17.21",
+    "@types/node": "20.16.11",
+    "@types/jsonwebtoken": "9.0.10",
+    "@types/cookie-parser": "1.4.9",
+    "@types/morgan": "1.9.4",
+    "jest": "29.7.0",
+    "ts-jest": "29.2.5",
+    "supertest": "6.3.4",
+    "@types/jest": "30.0.0",
+    "@types/supertest": "2.0.12"
+  }
+}
